@@ -43,6 +43,12 @@ public class AllAssetsPoolTests
             It.IsAny<Func<Task<IEnumerable<AssetResponseDto>>>>()
         ))
         .Returns<string, Func<Task<IEnumerable<AssetResponseDto>>>>(async (key, factory) => await factory());
+
+        _mockApiCache.Setup(c => c.GetOrAddAsync(
+            It.IsAny<string>(),
+            It.IsAny<Func<Task<IReadOnlySet<Guid>>>>()
+        ))
+        .Returns<string, Func<Task<IReadOnlySet<Guid>>>>(async (key, factory) => await factory());
     }
 
     private List<AssetResponseDto> CreateSampleAssets(int count, string idPrefix, AssetTypeEnum type, int? rating = null)
@@ -218,6 +224,24 @@ public class AllAssetsPoolTests
         Assert.That(result, Is.EqualTo(allAssets));
 
         // Verify that no excluded-album lookup happened since ExcludedAlbums is null
+        _mockImmichApi.Verify(api => api.SearchAssetsAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<MetadataSearchDto>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Test]
+    public async Task GetAssets_HideAssetsInOtherAlbumsWithoutAlbums_HasNoEffect()
+    {
+        // With no selected albums every album would be "other", so the setting must be ignored
+        _mockAccountSettings.SetupGet(s => s.HideAssetsInOtherAlbums).Returns(true);
+        _mockAccountSettings.SetupGet(s => s.Albums).Returns(new List<Guid>());
+
+        var allAssets = CreateSampleImageAssets(5, "asset");
+        _mockImmichApi.Setup(api => api.SearchRandomAsync(It.IsAny<RandomSearchDto>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(allAssets);
+
+        var result = (await _allAssetsPool.GetAssets(5)).ToList();
+
+        Assert.That(result, Is.EqualTo(allAssets));
+        _mockImmichApi.Verify(api => api.GetAllAlbumsAsync(It.IsAny<Guid?>(), It.IsAny<Guid?>(), It.IsAny<bool?>(), It.IsAny<bool?>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
         _mockImmichApi.Verify(api => api.SearchAssetsAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<MetadataSearchDto>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 }

@@ -45,6 +45,11 @@ public class CachingApiAssetsPoolTests
                 It.IsAny<Func<Task<IEnumerable<AssetResponseDto>>>>()
             ))
             .Returns<string, Func<Task<IEnumerable<AssetResponseDto>>>>(async (key, factory) => await factory());
+        _mockApiCache.Setup(c => c.GetOrAddAsync(
+                It.IsAny<string>(),
+                It.IsAny<Func<Task<IReadOnlySet<Guid>>>>()
+            ))
+            .Returns<string, Func<Task<IReadOnlySet<Guid>>>>(async (key, factory) => await factory());
 
         // Default account settings
         _mockAccountSettings.SetupGet(s => s.ShowArchived).Returns(true);

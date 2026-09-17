@@ -20,9 +20,11 @@ public abstract class CachingApiAssetsPool(IApiCache apiCache, ImmichApi immichA
 
     private async Task<IEnumerable<AssetResponseDto>> AllAssets(CancellationToken ct = default)
     {
-        var excludedAlbumAssets = await apiCache.GetOrAddAsync($"{GetType().FullName}_ExcludedAlbums", () => AssetHelper.GetExcludedAlbumAssets(immichApi, accountSettings));
+        var excludedAssetIds = await apiCache.GetOrAddAsync($"{GetType().FullName}_ExcludedAlbums", () => AssetHelper.GetExcludedAssetIds(immichApi, accountSettings));
 
-        return await apiCache.GetOrAddAsync(GetType().FullName!, () => LoadAssets().ApplyAccountFilters(accountSettings, excludedAlbumAssets));
+        // Cache the filtered list itself: a lazy query would re-run every filter each time an asset is picked
+        return await apiCache.GetOrAddAsync(GetType().FullName!,
+            async () => (IEnumerable<AssetResponseDto>)(await LoadAssets().ApplyAccountFilters(accountSettings, excludedAssetIds)).ToList());
     }
 
     protected abstract Task<IEnumerable<AssetResponseDto>> LoadAssets(CancellationToken ct = default);
